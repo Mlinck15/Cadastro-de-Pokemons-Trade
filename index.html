@@ -6,6 +6,66 @@
     <title>Padventures - Pokemons Para Venda</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        // ==========================================
+        // COLE SUA CONFIGURAÇÃO DO FIREBASE ABAIXO:
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            projectId: "SEU_PROJETO",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "SEU_SENDER_ID",
+            appId: "SEU_APP_ID"
+        };
+
+        // Inicializa o Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const defaultRawData = {
+            "Cloneds": [],
+            "Shiny": [],
+            "Normais": []
+        };
+
+        window.currentData = JSON.parse(JSON.stringify(defaultRawData));
+        window.currentCategory = 'all';
+
+        // Função para salvar no Firebase (Sincroniza na Nuvem)
+        window.saveDataToFirebase = async function() {
+            try {
+                await setDoc(doc(db, "padventures", "main_collection"), window.currentData);
+            } catch (error) {
+                console.error("Erro ao salvar no Firebase: ", error);
+            }
+        };
+
+        // Ouve atualizações em tempo real vindas da nuvem
+        function listenToFirebase() {
+            onSnapshot(doc(db, "padventures", "main_collection"), (docSnap) => {
+                if (docSnap.exists()) {
+                    window.currentData = docSnap.data();
+                    renderList();
+                } else {
+                    // Se estiver vazio na nuvem, salva o padrão inicial
+                    saveDataToFirebase();
+                    renderList();
+                }
+            }, (error) => {
+                console.error("Erro ao escutar dados: ", error);
+            });
+        }
+
+        // Inicializa ouvindo o Firebase ao carregar a página
+        listenToFirebase();
+    </script>
+
     <style>
         .pokemon-sprite {
             image-rendering: pixelated;
@@ -247,55 +307,8 @@
     </footer>
 
     <script>
-        const defaultRawData = {
-            "Cloneds": [],
-            "Shiny": [],
-            "Normais": []
-        };
-
-        let currentData = JSON.parse(JSON.stringify(defaultRawData));
-        let currentCategory = 'all';
-
-        function saveData() {
-            localStorage.setItem('padventures_data_v10', JSON.stringify(currentData));
-        }
-
-        // Tenta carregar do localStorage ou busca automaticamente o pokemons.json do GitHub Pages
-        function initData() {
-            const saved = localStorage.getItem('padventures_data_v10');
-            if (saved) {
-                try { 
-                    const parsed = JSON.parse(saved);
-                    const hasData = Object.values(parsed).some(arr => Array.isArray(arr) && arr.length > 0);
-                    if (hasData) {
-                        currentData = parsed;
-                        renderList();
-                        return;
-                    }
-                } catch(e) {}
-            }
-
-            // Se não houver dados locais, busca o pokemons.json do repositório automaticamente
-            fetch('pokemons.json')
-                .then(response => {
-                    if (!response.ok) throw new Error('Erro ao carregar JSON');
-                    return response.json();
-                })
-                .then(data => {
-                    if (data && typeof data === 'object') {
-                        currentData = data;
-                        saveData();
-                        renderList();
-                    }
-                })
-                .catch(err => {
-                    console.log('Nenhum JSON externo encontrado, usando padrão.');
-                    renderList();
-                });
-        }
-
-        function setCategory(cat) {
-            currentCategory = cat;
+        window.setCategory = function(cat) {
+            window.currentCategory = cat;
             document.querySelectorAll('.category-btn').forEach(btn => {
                 btn.className = "category-btn px-4 py-2 rounded-lg text-sm font-semibold transition bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 cursor-pointer";
             });
@@ -303,10 +316,10 @@
             if (activeBtn) {
                 activeBtn.className = "category-btn px-4 py-2 rounded-lg text-sm font-semibold transition bg-rose-600 text-white shadow-md shadow-rose-600/20 cursor-pointer";
             }
-            renderList();
+            window.renderList();
         }
 
-        function renderList() {
+        window.renderList = function() {
             const grid = document.getElementById('pokemonGrid');
             const emptyState = document.getElementById('emptyState');
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -315,16 +328,16 @@
             let total = 0, cloned = 0, shiny = 0, normal = 0;
             let displayedCount = 0;
 
-            Object.keys(currentData).forEach(cat => {
-                const count = currentData[cat].length;
+            Object.keys(window.currentData).forEach(cat => {
+                const count = window.currentData[cat].length;
                 total += count;
                 if (cat === 'Cloneds') cloned += count;
                 if (cat === 'Shiny') shiny += count;
                 if (cat === 'Normais') normal += count;
 
-                if (currentCategory !== 'all' && currentCategory !== cat) return;
+                if (window.currentCategory !== 'all' && window.currentCategory !== cat) return;
 
-                currentData[cat].forEach((pokemonObj, index) => {
+                window.currentData[cat].forEach((pokemonObj, index) => {
                     const title = pokemonObj.title || "";
                     const ability = pokemonObj.ability || "";
                     const details = pokemonObj.details || "";
@@ -395,7 +408,7 @@
             }
         }
 
-        function openAddModal() {
+        window.openAddModal = function() {
             document.getElementById('modalTitle').innerText = 'Adicionar Novo Pokémon';
             document.getElementById('editCategory').value = '';
             document.getElementById('editIndex').value = '';
@@ -408,21 +421,21 @@
             document.getElementById('pokemonModal').classList.remove('hidden');
         }
 
-        function openAutoModal() {
+        window.openAutoModal = function() {
             document.getElementById('autoModal').classList.remove('hidden');
         }
 
-        function closeAutoModal() {
+        window.closeAutoModal = function() {
             document.getElementById('autoModal').classList.add('hidden');
         }
 
-        function openEditModal(category, index) {
+        window.openEditModal = function(category, index) {
             document.getElementById('modalTitle').innerText = 'Editar Pokémon';
             document.getElementById('editCategory').value = category;
             document.getElementById('editIndex').value = index;
             document.getElementById('pokeCategory').value = category;
             
-            const item = currentData[category][index];
+            const item = window.currentData[category][index];
             document.getElementById('pokeTitle').value = item.title || "";
             document.getElementById('pokeAbility').value = item.ability || "";
             document.getElementById('pokeDetails').value = item.details || "";
@@ -433,11 +446,11 @@
             document.getElementById('pokemonModal').classList.remove('hidden');
         }
 
-        function closeModal() {
+        window.closeModal = function() {
             document.getElementById('pokemonModal').classList.add('hidden');
         }
 
-        function savePokemon(event) {
+        window.savePokemon = function(event) {
             event.preventDefault();
             const category = document.getElementById('pokeCategory').value;
             const title = document.getElementById('pokeTitle').value.trim();
@@ -455,8 +468,8 @@
             let existingBallImg = "";
 
             if (editCategory !== "" && editIndex !== "") {
-                existingSprite = currentData[editCategory][editIndex].sprite || "";
-                existingBallImg = currentData[editCategory][editIndex].ballImg || "";
+                existingSprite = window.currentData[editCategory][editIndex].sprite || "";
+                existingBallImg = window.currentData[editCategory][editIndex].ballImg || "";
             }
 
             const finalizeSave = (spriteBase64, ballBase64) => {
@@ -470,17 +483,16 @@
                 };
 
                 if (editCategory !== "" && editIndex !== "") {
-                    currentData[editCategory].splice(editIndex, 1);
-                    if (!currentData[category]) currentData[category] = [];
-                    currentData[category].push(newItem);
+                    window.currentData[editCategory].splice(editIndex, 1);
+                    if (!window.currentData[category]) window.currentData[category] = [];
+                    window.currentData[category].push(newItem);
                 } else {
-                    if (!currentData[category]) currentData[category] = [];
-                    currentData[category].push(newItem);
+                    if (!window.currentData[category]) window.currentData[category] = [];
+                    window.currentData[category].push(newItem);
                 }
 
-                saveData();
+                saveDataToFirebase();
                 closeModal();
-                renderList();
             };
 
             let processedSprite = null;
@@ -512,137 +524,15 @@
             }
         }
 
-        async function processBatchImport() {
-            const category = document.getElementById('autoCategory').value;
-            const rawText = document.getElementById('autoTextList').value.trim();
-            const spriteFiles = document.getElementById('batchSpriteFiles').files;
-            const ballFiles = document.getElementById('batchBallFiles').files;
-
-            if (!rawText) {
-                alert("Por favor, insira a lista de nomenclaturas.");
-                return;
-            }
-
-            const spriteMap = {};
-            for (let file of spriteFiles) {
-                const base64 = await toBase64(file);
-                const cleanName = file.name.substring(0, file.name.lastIndexOf('.')).toLowerCase().replace(/[^a-z0-9]/g, '');
-                spriteMap[cleanName] = base64;
-            }
-
-            const ballMap = {};
-            for (let file of ballFiles) {
-                const base64 = await toBase64(file);
-                const cleanName = file.name.substring(0, file.name.lastIndexOf('.')).toLowerCase().replace(/[^a-z0-9]/g, '');
-                ballMap[cleanName] = base64;
-            }
-
-            const lines = rawText.split('\n');
-            if (!currentData[category]) currentData[category] = [];
-
-            let addedCount = 0;
-
-            for (let line of lines) {
-                line = line.trim();
-                if (!line) continue;
-
-                let title = line;
-                let ability = "";
-                let details = "";
-                let ballName = "POKEBALL";
-                let detectedBallKeys = [];
-
-                const lowerLine = line.toLowerCase();
-
-                if (lowerLine.includes('rocket')) { ballName = 'ROCKET BALL'; detectedBallKeys = ['rocket', 'rock']; }
-                else if (lowerLine.includes('aqua')) { ballName = 'AQUA POKEBALL'; detectedBallKeys = ['aqua']; }
-                else if (lowerLine.includes('moon')) { ballName = 'MOON BALL'; detectedBallKeys = ['moon']; }
-                else if (lowerLine.includes('heavy')) { ballName = 'HEAVY BALL'; detectedBallKeys = ['heavy']; }
-                else if (lowerLine.includes('premier')) { ballName = 'PREMIER BALL'; detectedBallKeys = ['premier']; }
-                else if (lowerLine.includes('ultra')) { ballName = 'ULTRA BALL'; detectedBallKeys = ['ultra']; }
-                else if (lowerLine.includes('great')) { ballName = 'GREAT BALL'; detectedBallKeys = ['great']; }
-                else if (lowerLine.includes('master')) { ballName = 'MASTER BALL'; detectedBallKeys = ['master']; }
-                else if (lowerLine.includes('fast')) { ballName = 'FAST BALL'; detectedBallKeys = ['fast']; }
-                else if (lowerLine.includes('sport')) { ballName = 'SPORT BALL'; detectedBallKeys = ['sport']; }
-                else if (lowerLine.includes('nest')) { ballName = 'NEST BALL'; detectedBallKeys = ['nest']; }
-                else if (lowerLine.includes('repeat')) { ballName = 'REPEAT BALL'; detectedBallKeys = ['repeat']; }
-                else if (lowerLine.includes('timer')) { ballName = 'TIMER BALL'; detectedBallKeys = ['timer']; }
-                else if (lowerLine.includes('luxury')) { ballName = 'LUXURY BALL'; detectedBallKeys = ['luxury']; }
-                else if (lowerLine.includes('friend')) { ballName = 'FRIEND BALL'; detectedBallKeys = ['friend']; }
-                else if (lowerLine.includes('love')) { ballName = 'LOVE BALL'; detectedBallKeys = ['love']; }
-                else if (lowerLine.includes('level')) { ballName = 'LEVEL BALL'; detectedBallKeys = ['level']; }
-                else if (lowerLine.includes('lure')) { ballName = 'LURE BALL'; detectedBallKeys = ['lure']; }
-                else if (lowerLine.includes('beast')) { ballName = 'BEAST BALL'; detectedBallKeys = ['beast']; }
-                else if (lowerLine.includes('cherish')) { ballName = 'CHERISH BALL'; detectedBallKeys = ['cherish']; }
-                else { ballName = 'POKEBALL'; detectedBallKeys = ['poke', 'normal']; }
-
-                if (line.includes("Ability:")) {
-                    const parts = line.split("Ability:");
-                    title = parts[0].trim();
-                    const rest = parts[1].trim();
-                    const restParts = rest.split("TM:");
-                    ability = "Ability: " + restParts[0].trim();
-                    if (restParts.length > 1) {
-                        details = restParts.slice(1).map(tm => "TM: " + tm.trim()).join('\n');
-                    }
-                }
-
-                let foundSprite = "";
-                const searchKeyPoke = title.toLowerCase().replace(/[^a-z0-9]/g, '');
-                for (let key in spriteMap) {
-                    if (searchKeyPoke.includes(key) || key.includes(searchKeyPoke.substring(0, 6))) {
-                        foundSprite = spriteMap[key];
-                        break;
-                    }
-                }
-
-                let foundBall = "";
-                for (let bKey of detectedBallKeys) {
-                    for (let key in ballMap) {
-                        if (key.includes(bKey)) {
-                            foundBall = ballMap[key];
-                            break;
-                        }
-                    }
-                    if (foundBall) break;
-                }
-
-                currentData[category].push({
-                    title: title,
-                    ability: ability,
-                    details: details,
-                    ballName: ballName,
-                    sprite: foundSprite,
-                    ballImg: foundBall
-                });
-                addedCount++;
-            }
-
-            saveData();
-            closeAutoModal();
-            renderList();
-            alert(`${addedCount} registros importados e vinculados com sucesso!`);
-        }
-
-        function toBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = error => reject(error);
-            });
-        }
-
-        function deletePokemon(category, index) {
+        window.deletePokemon = function(category, index) {
             if (confirm("Deseja realmente vender/excluir este registro?")) {
-                currentData[category].splice(index, 1);
-                saveData();
-                renderList();
+                window.currentData[category].splice(index, 1);
+                saveDataToFirebase();
             }
         }
 
-        function exportData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentData, null, 2));
+        window.exportData = function() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.currentData, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
             downloadAnchor.setAttribute("download", "pokemons.json");
@@ -651,7 +541,7 @@
             downloadAnchor.remove();
         }
 
-        function importData(event) {
+        window.importData = function(event) {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
@@ -659,10 +549,9 @@
                 try {
                     const parsed = JSON.parse(e.target.result);
                     if (parsed && typeof parsed === 'object') {
-                        currentData = parsed;
-                        saveData();
-                        renderList();
-                        alert("Dados importados com sucesso!");
+                        window.currentData = parsed;
+                        saveDataToFirebase();
+                        alert("Dados importados para a nuvem com sucesso!");
                     } else {
                         alert("Arquivo JSON inválido.");
                     }
@@ -674,15 +563,12 @@
             event.target.value = '';
         }
 
-        function resetToDefault() {
-            if (confirm("Deseja restaurar a lista a partir do pokemons.json oficial?")) {
-                localStorage.removeItem('padventures_data_v10');
-                initData();
+        window.resetToDefault = function() {
+            if (confirm("Deseja restaurar a base vazia?")) {
+                window.currentData = { "Cloneds": [], "Shiny": [], "Normais": [] };
+                saveDataToFirebase();
             }
         }
-
-        // Inicializa os dados ao abrir a página
-        initData();
     </script>
 </body>
 </html>
