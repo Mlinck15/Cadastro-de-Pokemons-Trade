@@ -38,6 +38,9 @@
                 
                 snapshot.forEach((docSnap) => {
                     const data = docSnap.data();
+                    // Ignora o documento de teste se existir
+                    if(data.title === "Teste") return;
+                    
                     const cat = data.category || "Normais";
                     if (!newData[cat]) newData[cat] = [];
                     newData[cat].push({
@@ -52,31 +55,9 @@
                 }
             }, (error) => {
                 console.error("Erro ao sincronizar com o Firebase: ", error);
+                alert("Erro de conexão com o Firebase: " + error.message);
             });
         }
-
-        window.saveSinglePokemonToFirebase = async function(category, pokemonObj) {
-            try {
-                const docId = pokemonObj.id || `${category}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-                const ref = doc(db, "pokemons_v2", docId);
-                const dataToSave = { ...pokemonObj, category: category, id: docId };
-                await setDoc(ref, dataToSave);
-            } catch (error) {
-                console.error("Erro ao salvar no Firebase: ", error);
-                alert("Erro ao salvar no Firebase: " + error.message);
-            }
-        };
-
-        window.deletePokemonFromFirebase = async function(category, index) {
-            try {
-                const item = window.currentData[category][index];
-                if (item && item.id) {
-                    await deleteDoc(doc(db, "pokemons_v2", item.id));
-                }
-            } catch (error) {
-                console.error("Erro ao excluir do Firebase: ", error);
-            }
-        };
 
         window.importBatchToFirebase = async function(itemsArray) {
             try {
@@ -102,7 +83,18 @@
                 alert(`${count} Pokémons importados para a nuvem com sucesso!`);
             } catch (error) {
                 console.error("Erro na importação em massa: ", error);
-                alert("Erro ao importar para a nuvem: " + error.message);
+                alert("Erro crítico ao gravar no Firebase: " + error.message);
+            }
+        };
+
+        window.deletePokemonFromFirebase = async function(category, index) {
+            try {
+                const item = window.currentData[category][index];
+                if (item && item.id) {
+                    await deleteDoc(doc(db, "pokemons_v2", item.id));
+                }
+            } catch (error) {
+                console.error("Erro ao excluir do Firebase: ", error);
             }
         };
 
@@ -147,16 +139,16 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <button onclick="openAutoModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer" title="Cadastro e Vínculo em Massa por Imagens">
+                <button onclick="openAutoModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Importação Automática
                 </button>
                 <button onclick="openAddModal()" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-rose-600/20 cursor-pointer">
                     <i class="fa-solid fa-plus"></i> Novo Pokémon
                 </button>
-                <button onclick="exportData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-slate-700 cursor-pointer" title="Exportar JSON">
+                <button onclick="exportData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-slate-700 cursor-pointer">
                     <i class="fa-solid fa-download"></i> Exportar
                 </button>
-                <label class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-slate-700 cursor-pointer" title="Importar JSON">
+                <label class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-slate-700 cursor-pointer">
                     <i class="fa-solid fa-upload"></i> Importar
                     <input type="file" id="importFile" accept=".json" onchange="importData(event)" class="hidden">
                 </label>
@@ -588,6 +580,18 @@
             }
         }
 
+        window.saveSinglePokemonToFirebase = async function(category, pokemonObj) {
+            try {
+                const docId = pokemonObj.id || `${category}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+                const ref = doc(db, "pokemons_v2", docId);
+                const dataToSave = { ...pokemonObj, category: category, id: docId };
+                await setDoc(ref, dataToSave);
+            } catch (error) {
+                console.error("Erro ao salvar no Firebase: ", error);
+                alert("Erro ao salvar no Firebase: " + error.message);
+            }
+        };
+
         window.deletePokemon = async function(category, index) {
             if (confirm("Deseja realmente vender/excluir este registro?")) {
                 await deletePokemonFromFirebase(category, index);
@@ -598,7 +602,7 @@
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.currentData, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "pokemons.json");
+            downloadAnchor.setAttribute("download", "TradePokesOficial.json");
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
