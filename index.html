@@ -25,7 +25,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // NOME DA COLEÇÃO CORRIGIDO PARA CORRESPONDER AO FIREBASE
         const COLLECTION_NAME = "TradePokesOficial";
 
         window.currentData = {
@@ -38,6 +37,7 @@
         function listenToFirebase() {
             onSnapshot(collection(db, COLLECTION_NAME), (snapshot) => {
                 const newData = { "Cloneds": [], "Shiny": [], "Normais": [] };
+                let count = 0;
                 
                 snapshot.forEach((docSnap) => {
                     const data = docSnap.data();
@@ -49,18 +49,50 @@
                         id: docSnap.id,
                         ...data
                     });
+                    count++;
                 });
 
                 window.currentData = newData;
                 if (typeof window.renderList === 'function') {
                     window.renderList();
                 }
+
+                // Se o Firebase estiver totalmente vazio, tenta carregar automaticamente o ficheiro local TradePokesOficial.json
+                if (count === 0 && !window.hasAutoImported) {
+                    window.hasAutoImported = true;
+                    loadLocalJsonAutomatically();
+                }
             }, (error) => {
-                console.error("Erro ao sincronizar com o Firebase: ", error);
+                console.error("Erro no Firebase: ", error);
+                alert("Erro ao conectar ao Firebase: " + error.message + "\n\nVerifique se as Regras do Firestore estão abertas.");
             });
         }
 
-        window.importBatchToFirebase = async function(itemsArray) {
+        async function loadLocalJsonAutomatically() {
+            try {
+                const response = await fetch('./TradePokesOficial.json');
+                if (!response.ok) return;
+                const parsed = await response.json();
+                
+                if (parsed && typeof parsed === 'object') {
+                    let flatArray = [];
+                    for(let cat of Object.keys(parsed)) {
+                        if(Array.isArray(parsed[cat])) {
+                            parsed[cat].forEach(item => {
+                                flatArray.push({ ...item, category: cat });
+                            });
+                        }
+                    }
+                    if (flatArray.length > 0) {
+                        await window.importBatchToFirebase(flatArray, true);
+                    }
+                }
+            } catch (err) {
+                console.log("Não foi possível carregar o JSON local automaticamente:", err);
+            }
+        }
+
+        window.importBatchToFirebase = async function(itemsArray, isSilent = false) {
             try {
                 let batch = writeBatch(db);
                 let count = 0;
@@ -81,10 +113,12 @@
                 if (count % 400 !== 0) {
                     await batch.commit();
                 }
-                alert(`${count} Pokémons importados para a nuvem com sucesso!`);
+                if (!isSilent) {
+                    alert(`${count} Pokémons importados com sucesso!`);
+                }
             } catch (error) {
-                console.error("Erro na importação em massa: ", error);
-                alert("Erro crítico ao gravar no Firebase: " + error.message);
+                console.error("Erro na importação: ", error);
+                alert("ERRO DE PERMISSÃO OU GRAVAÇÃO:\n" + error.message + "\n\nSe o erro for 'Permission Denied', atualize as Regras no painel do Firebase!");
             }
         };
 
@@ -249,7 +283,7 @@
                 <i class="fa-solid fa-ghost"></i>
             </div>
             <h3 class="text-lg font-bold text-white">Nenhum Pokémon encontrado</h3>
-            <p class="text-sm text-slate-400 mt-1">Tente importar sua base JSON para a nuvem.</p>
+            <p class="text-sm text-slate-400 mt-1">Carregando dados...</p>
         </div>
 
     </main>
