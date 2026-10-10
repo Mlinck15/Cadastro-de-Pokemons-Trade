@@ -54,7 +54,7 @@
                 }
             }, (error) => {
                 console.error("Erro no Firebase: ", error);
-                alert("Erro ao conectar ao Firebase: " + error.message);
+                alert("Erro de conexão com o Firebase: " + error.message);
             });
         }
 
@@ -62,24 +62,31 @@
             try {
                 let batch = writeBatch(db);
                 let count = 0;
+                let totalSaved = 0;
 
-                for (let p of itemsArray) {
+                for (let i = 0; i < itemsArray.length; i++) {
+                    const p = itemsArray[i];
                     const cat = p.category || "Normais";
-                    const docId = `${cat}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+                    const docId = p.id || `${cat}_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`;
                     const ref = doc(db, COLLECTION_NAME, docId);
                     
                     batch.set(ref, { ...p, category: cat, id: docId });
                     count++;
+                    totalSaved++;
 
-                    if (count % 400 === 0) {
+                    // Commit a cada 100 itens para não estourar os limites do Firestore
+                    if (count === 100) {
                         await batch.commit();
                         batch = writeBatch(db);
+                        count = 0;
                     }
                 }
-                if (count % 400 !== 0) {
+
+                if (count > 0) {
                     await batch.commit();
                 }
-                alert(`${count} Pokémons gravados na nuvem com sucesso!`);
+
+                alert(`Sucesso! ${totalSaved} Pokémons gravados na nuvem do Firebase.`);
             } catch (error) {
                 console.error("Erro na importação: ", error);
                 alert("Erro ao gravar no Firebase: " + error.message);
@@ -106,6 +113,7 @@
                 }
             } catch (error) {
                 console.error("Erro ao excluir do Firebase: ", error);
+                alert("Erro ao excluir: " + error.message);
             }
         };
 
@@ -618,13 +626,26 @@
                     if (parsed && typeof parsed === 'object') {
                         if (confirm("Deseja enviar estes Pokémons diretamente para o Firebase?")) {
                             let flatArray = [];
-                            for(let cat of Object.keys(parsed)) {
-                                if(Array.isArray(parsed[cat])) {
-                                    parsed[cat].forEach(item => {
-                                        flatArray.push({ ...item, category: cat });
-                                    });
+                            
+                            // Suporta tanto formato em categorias { Cloneds: [], Shiny: [], Normais: [] } 
+                            // quanto formato em lista simples [ {}, {} ]
+                            if (Array.isArray(parsed)) {
+                                flatArray = parsed;
+                            } else {
+                                for(let cat of Object.keys(parsed)) {
+                                    if(Array.isArray(parsed[cat])) {
+                                        parsed[cat].forEach(item => {
+                                            flatArray.push({ ...item, category: cat });
+                                        });
+                                    }
                                 }
                             }
+
+                            if (flatArray.length === 0) {
+                                alert("Nenhum registro válido foi encontrado dentro do arquivo JSON selecionado.");
+                                return;
+                            }
+
                             await importBatchToFirebase(flatArray);
                         }
                     } else {
