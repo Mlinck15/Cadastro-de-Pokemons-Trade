@@ -248,37 +248,50 @@
 
     <script>
         const defaultRawData = {
-            "Cloneds": [
-                {
-                    title: "Cloned Vaporeon [130][M][+1 addon]",
-                    ability: "Ability: Water Absorb",
-                    details: "TM: Rain Dance\nTM: Reflect",
-                    ballName: "AQUA POKEBALL",
-                    sprite: "",
-                    ballImg: ""
-                }
-            ],
+            "Cloneds": [],
             "Shiny": [],
             "Normais": []
         };
 
-        function loadInitialData() {
-            const saved = localStorage.getItem('padventures_data_v9');
+        let currentData = JSON.parse(JSON.stringify(defaultRawData));
+        let currentCategory = 'all';
+
+        function saveData() {
+            localStorage.setItem('padventures_data_v10', JSON.stringify(currentData));
+        }
+
+        // Tenta carregar do localStorage ou busca automaticamente o pokemons.json do GitHub Pages
+        function initData() {
+            const saved = localStorage.getItem('padventures_data_v10');
             if (saved) {
                 try { 
                     const parsed = JSON.parse(saved);
                     const hasData = Object.values(parsed).some(arr => Array.isArray(arr) && arr.length > 0);
-                    if (hasData) return parsed;
+                    if (hasData) {
+                        currentData = parsed;
+                        renderList();
+                        return;
+                    }
                 } catch(e) {}
             }
-            return JSON.parse(JSON.stringify(defaultRawData));
-        }
 
-        let currentData = loadInitialData();
-        let currentCategory = 'all';
-
-        function saveData() {
-            localStorage.setItem('padventures_data_v9', JSON.stringify(currentData));
+            // Se não houver dados locais, busca o pokemons.json do repositório automaticamente
+            fetch('pokemons.json')
+                .then(response => {
+                    if (!response.ok) throw new Error('Erro ao carregar JSON');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && typeof data === 'object') {
+                        currentData = data;
+                        saveData();
+                        renderList();
+                    }
+                })
+                .catch(err => {
+                    console.log('Nenhum JSON externo encontrado, usando padrão.');
+                    renderList();
+                });
         }
 
         function setCategory(cat) {
@@ -662,15 +675,14 @@
         }
 
         function resetToDefault() {
-            if (confirm("Deseja restaurar a lista original padrão?")) {
-                localStorage.removeItem('padventures_data_v9');
-                currentData = JSON.parse(JSON.stringify(defaultRawData));
-                saveData();
-                renderList();
+            if (confirm("Deseja restaurar a lista a partir do pokemons.json oficial?")) {
+                localStorage.removeItem('padventures_data_v10');
+                initData();
             }
         }
 
-        renderList();
+        // Inicializa os dados ao abrir a página
+        initData();
     </script>
 </body>
 </html>
