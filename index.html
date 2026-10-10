@@ -13,15 +13,16 @@
         import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         // ==========================================
-        // COLE A SUA CONFIGURAÇÃO DO FIREBASE ABAIXO:
+        // CONFIGURAÇÃO REAL DO SEU FIREBASE
         // ==========================================
         const firebaseConfig = {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_PROJETO.firebaseapp.com",
-            projectId: "SEU_PROJETO",
-            storageBucket: "SEU_PROJETO.appspot.com",
-            messagingSenderId: "SEU_SENDER_ID",
-            appId: "SEU_APP_ID"
+            apiKey: "AIzaSyCF3h13sBf0QpdbE-NYHkdY0ZibHUeXaPk",
+            authDomain: "pokemons-para-venda.firebaseapp.com",
+            projectId: "pokemons-para-venda",
+            storageBucket: "pokemons-para-venda.firebasestorage.app",
+            messagingSenderId: "940835640207",
+            appId: "1:940835640207:web:a653551b67a20e9dfd31fa",
+            measurementId: "G-6BNXCJT3KZ"
         };
 
         // Inicializa o Firebase
@@ -96,7 +97,6 @@
                             batch.set(ref, { ...p, category: cat, id: docId });
                             count++;
 
-                            // O Firebase permite no máximo 500 operações por Lote
                             if (count % 400 === 0) {
                                 await batch.commit();
                                 batch = writeBatch(db);
