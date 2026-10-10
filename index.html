@@ -83,25 +83,24 @@
             }
         };
 
-        // Importação em Lote para o Firebase
-        window.importBatchToFirebase = async function(jsonData) {
+        // Importação em Lote Otimizada para o Firebase
+        window.importBatchToFirebase = async function(itemsArray) {
             try {
                 let batch = writeBatch(db);
                 let count = 0;
 
-                for (let cat of Object.keys(jsonData)) {
-                    if (Array.isArray(jsonData[cat])) {
-                        for (let p of jsonData[cat]) {
-                            const docId = `${cat}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-                            const ref = doc(db, "pokemons_v2", docId);
-                            batch.set(ref, { ...p, category: cat, id: docId });
-                            count++;
+                for (let p of itemsArray) {
+                    const cat = p.category || "Normais";
+                    const docId = p.id || `${cat}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+                    const ref = doc(db, "pokemons_v2", docId);
+                    
+                    batch.set(ref, { ...p, category: cat, id: docId });
+                    count++;
 
-                            if (count % 400 === 0) {
-                                await batch.commit();
-                                batch = writeBatch(db);
-                            }
-                        }
+                    // O Firebase permite no máximo 400-500 operações por Lote
+                    if (count % 400 === 0) {
+                        await batch.commit();
+                        batch = writeBatch(db);
                     }
                 }
                 if (count % 400 !== 0) {
@@ -392,6 +391,7 @@
             const searchInput = document.getElementById('searchInput');
             const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
             
+            if(!grid) return;
             grid.innerHTML = '';
             let total = 0, cloned = 0, shiny = 0, normal = 0;
             let displayedCount = 0;
@@ -621,7 +621,15 @@
                     const parsed = JSON.parse(e.target.result);
                     if (parsed && typeof parsed === 'object') {
                         if (confirm("Deseja importar estes Pokémons para a nuvem?")) {
-                            await importBatchToFirebase(parsed);
+                            let flatArray = [];
+                            for(let cat of Object.keys(parsed)) {
+                                if(Array.isArray(parsed[cat])) {
+                                    parsed[cat].forEach(item => {
+                                        flatArray.push({ ...item, category: cat });
+                                    });
+                                }
+                            }
+                            await importBatchToFirebase(flatArray);
                         }
                     } else {
                         alert("Arquivo JSON inválido.");
@@ -683,7 +691,7 @@
                 }
 
                 const lines = rawText.split('\n');
-                let addedCount = 0;
+                let itemsToBatch = [];
 
                 for (let line of lines) {
                     line = line.trim();
@@ -743,21 +751,20 @@
                         if (foundBall) break;
                     }
 
-                    const newItem = {
+                    itemsToBatch.push({
+                        category: category,
                         title: title,
                         ability: ability,
                         details: details,
                         ballName: ballName,
                         sprite: foundSprite,
                         ballImg: foundBall
-                    };
-
-                    await window.saveSinglePokemonToFirebase(category, newItem);
-                    addedCount++;
+                    });
                 }
 
+                // Envia todos os itens recolhidos de uma só vez para o Firebase de forma segura
+                await importBatchToFirebase(itemsToBatch);
                 closeAutoModal();
-                alert(`${addedCount} registos processados e salvos na nuvem com sucesso!`);
             } catch (error) {
                 console.error("Erro na importação em massa: ", error);
                 alert("Ocorreu um erro ao processar os ficheiros: " + error.message);
