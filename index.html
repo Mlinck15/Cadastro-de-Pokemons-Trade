@@ -247,6 +247,7 @@
     </footer>
 
     <script>
+        // Base de dados embutida diretamente para garantir funcionamento imediato no GitHub Pages
         const defaultRawData = {
             "Cloneds": [],
             "Shiny": [],
@@ -254,26 +255,14 @@
         };
 
         function loadInitialData() {
-            const saved = localStorage.getItem('padventures_data_v6');
+            const saved = localStorage.getItem('padventures_data_v7');
             if (saved) {
-                try { return JSON.parse(saved); } catch(e) {}
+                try { 
+                    const parsed = JSON.parse(saved);
+                    const hasData = Object.values(parsed).some(arr => Array.isArray(arr) && arr.length > 0);
+                    if (hasData) return parsed;
+                } catch(e) {}
             }
-            
-            // Tenta carregar automaticamente o arquivo pokemons.json do GitHub Pages
-            fetch('pokemons.json')
-                .then(response => {
-                    if (!response.ok) throw new Error('Arquivo não encontrado');
-                    return response.json();
-                })
-                .then(data => {
-                    if (data && typeof data === 'object') {
-                        currentData = data;
-                        saveData();
-                        renderList();
-                    }
-                })
-                .catch(err => console.log('Usando base vazia padrão.'));
-
             return JSON.parse(JSON.stringify(defaultRawData));
         }
 
@@ -281,7 +270,7 @@
         let currentCategory = 'all';
 
         function saveData() {
-            localStorage.setItem('padventures_data_v6', JSON.stringify(currentData));
+            localStorage.setItem('padventures_data_v7', JSON.stringify(currentData));
         }
 
         function setCategory(cat) {
@@ -502,7 +491,6 @@
             }
         }
 
-        // Processamento em massa robusto para associar a Pokébola correta e o Sprite correto linha por linha
         async function processBatchImport() {
             const category = document.getElementById('autoCategory').value;
             const rawText = document.getElementById('autoTextList').value.trim();
@@ -514,7 +502,6 @@
                 return;
             }
 
-            // Mapeia Sprites
             const spriteMap = {};
             for (let file of spriteFiles) {
                 const base64 = await toBase64(file);
@@ -522,7 +509,6 @@
                 spriteMap[cleanName] = base64;
             }
 
-            // Mapeia Balls
             const ballMap = {};
             for (let file of ballFiles) {
                 const base64 = await toBase64(file);
@@ -547,7 +533,6 @@
 
                 const lowerLine = line.toLowerCase();
 
-                // Identifica a Pokébola específica mencionada na linha
                 if (lowerLine.includes('rocket')) { ballName = 'ROCKET BALL'; detectedBallKeys = ['rocket', 'rock']; }
                 else if (lowerLine.includes('aqua')) { ballName = 'AQUA POKEBALL'; detectedBallKeys = ['aqua']; }
                 else if (lowerLine.includes('moon')) { ballName = 'MOON BALL'; detectedBallKeys = ['moon']; }
@@ -581,7 +566,6 @@
                     }
                 }
 
-                // Busca o Sprite correto do Pokémon pelo nome
                 let foundSprite = "";
                 const searchKeyPoke = title.toLowerCase().replace(/[^a-z0-9]/g, '');
                 for (let key in spriteMap) {
@@ -591,7 +575,6 @@
                     }
                 }
 
-                // Busca a imagem da Ball correta baseada nas chaves detetadas
                 let foundBall = "";
                 for (let bKey of detectedBallKeys) {
                     for (let key in ballMap) {
@@ -672,9 +655,8 @@
 
         function resetToDefault() {
             if (confirm("Deseja restaurar a lista original padrão?")) {
-                currentData = JSON.parse(JSON.stringify(defaultRawData));
-                saveData();
-                renderList();
+                localStorage.removeItem('padventures_data_v7');
+                location.reload();
             }
         }
 
