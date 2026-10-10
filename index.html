@@ -54,18 +54,34 @@
                 }
             }, (error) => {
                 console.error("Erro no Firebase: ", error);
-                alert("Erro ao conectar ao Firebase: " + error.message);
             });
         }
 
         window.importBatchToFirebase = async function(itemsArray) {
             try {
+                // 1. Limpa a nuvem primeiro para evitar duplicados e contagens erradas
+                const snapshot = await getDocs(collection(db, COLLECTION_NAME));
+                let clearBatch = writeBatch(db);
+                let clearCount = 0;
+                snapshot.forEach((docSnap) => {
+                    clearBatch.delete(docSnap.ref);
+                    clearCount++;
+                    if (clearCount >= 400) {
+                        clearBatch.commit();
+                        clearBatch = writeBatch(db);
+                        clearCount = 0;
+                    }
+                });
+                if (clearCount > 0) await clearBatch.commit();
+
+                // 2. Insere todos os itens limpos e organizados
                 let batch = writeBatch(db);
                 let count = 0;
 
                 for (let p of itemsArray) {
                     const cat = p.category || "Normais";
-                    const docId = p.id || `${cat}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+                    // Garante um ID único limpo baseado no índice/timestamp para evitar conflitos
+                    const docId = `${cat}_${count}_${Date.now()}`;
                     const ref = doc(db, COLLECTION_NAME, docId);
                     
                     batch.set(ref, { ...p, category: cat, id: docId });
@@ -79,7 +95,7 @@
                 if (count % 400 !== 0) {
                     await batch.commit();
                 }
-                alert(`${count} Pokémons importados para a nuvem com sucesso!`);
+                alert(`Sincronização concluída! ${count} Pokémons gravados na nuvem.`);
             } catch (error) {
                 console.error("Erro na importação: ", error);
                 alert("Erro ao gravar no Firebase: " + error.message);
@@ -106,7 +122,6 @@
                 }
             } catch (error) {
                 console.error("Erro ao excluir do Firebase: ", error);
-                alert("Erro ao excluir: " + error.message);
             }
         };
 
@@ -120,6 +135,7 @@
                     count++;
                 });
                 if (count > 0) await batch.commit();
+                alert("Nuvem limpa com sucesso!");
             } catch (error) {
                 console.error("Erro ao limpar nuvem: ", error);
             }
@@ -616,7 +632,7 @@
                 try {
                     const parsed = JSON.parse(e.target.result);
                     if (parsed && typeof parsed === 'object') {
-                        if (confirm("Deseja importar estes Pokémons para a nuvem?")) {
+                        if (confirm("Deseja substituir e importar estes Pokémons para a nuvem?")) {
                             let flatArray = [];
                             for(let cat of Object.keys(parsed)) {
                                 if(Array.isArray(parsed[cat])) {
@@ -641,7 +657,6 @@
         window.resetToDefault = async function() {
             if (confirm("Deseja limpar todos os Pokémons salvos na nuvem?")) {
                 await clearFirebaseData();
-                alert("Nuvem limpa!");
             }
         }
 
@@ -705,11 +720,11 @@
                     if (lowerLine.includes('yellow pokeball')) { ballName = 'YELLOW POKEBALL'; detectedBallKeys = ['yellow', 'poke']; }
                     else if (lowerLine.includes('rocket')) { ballName = 'ROCKET BALL'; detectedBallKeys = ['rocket', 'rock']; }
                     else if (lowerLine.includes('aqua')) { ballName = 'AQUA POKEBALL'; detectedBallKeys = ['aqua']; }
-                    else if (lowerLine.includes('moon')) { ballName = 'MOON BALL'; detectedBallKeys = ['moon']; }
+                    else if (lowerLine.includes('moon')) { ballName, detectedBallKeys = ['moon']; }
                     else if (lowerLine.includes('heavy')) { ballName = 'HEAVY BALL'; detectedBallKeys = ['heavy']; }
                     else if (lowerLine.includes('premier')) { ballName = 'PREMIER BALL'; detectedBallKeys = ['premier']; }
                     else if (lowerLine.includes('ultra')) { ballName = 'ULTRA BALL'; detectedBallKeys = ['ultra']; }
-                    else if (lowerLine.includes('great')) { ballName = 'GREAT BALL'; detectedBallKeys = ['great']; }
+                    else if (lowerLine.includes('great')) { ballName = 'GREAT BALL'; detectedBallKeys, detectedBallKeys = ['great']; }
                     else if (lowerLine.includes('master')) { ballName = 'MASTER BALL'; detectedBallKeys = ['master']; }
                     else if (lowerLine.includes('repeat')) { ballName = 'REPEAT BALL'; detectedBallKeys = ['repeat']; }
                     else { ballName = 'POKEBALL'; detectedBallKeys = ['poke', 'normal']; }
