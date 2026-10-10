@@ -25,7 +25,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Nome exato da coleção no Firestore
         const COLLECTION_NAME = "TradePokesOficial";
 
         window.currentData = {
@@ -61,28 +60,12 @@
 
         window.importBatchToFirebase = async function(itemsArray) {
             try {
-                // 1. Limpa a nuvem primeiro para garantir sincronização limpa
-                const snapshot = await getDocs(collection(db, COLLECTION_NAME));
-                let clearBatch = writeBatch(db);
-                let clearCount = 0;
-                snapshot.forEach((docSnap) => {
-                    clearBatch.delete(docSnap.ref);
-                    clearCount++;
-                    if (clearCount >= 400) {
-                        clearBatch.commit();
-                        clearBatch = writeBatch(db);
-                        clearCount = 0;
-                    }
-                });
-                if (clearCount > 0) await clearBatch.commit();
-
-                // 2. Insere os novos itens lote a lote
                 let batch = writeBatch(db);
                 let count = 0;
 
                 for (let p of itemsArray) {
                     const cat = p.category || "Normais";
-                    const docId = `${cat}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                    const docId = `${cat}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
                     const ref = doc(db, COLLECTION_NAME, docId);
                     
                     batch.set(ref, { ...p, category: cat, id: docId });
@@ -96,7 +79,7 @@
                 if (count % 400 !== 0) {
                     await batch.commit();
                 }
-                alert(`${count} Pokémons gravados na nuvem com sucesso! Verifique o painel do Firebase.`);
+                alert(`${count} Pokémons gravados na nuvem com sucesso!`);
             } catch (error) {
                 console.error("Erro na importação: ", error);
                 alert("Erro ao gravar no Firebase: " + error.message);
