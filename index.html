@@ -36,7 +36,7 @@
         };
         window.currentCategory = 'all';
 
-        // Escuta as alterações na nuvem em tempo real (documentos separados para ultrapassar o limite de 1MB)
+        // Escuta as alterações na nuvem em tempo real
         function listenToFirebase() {
             onSnapshot(collection(db, "pokemons_v2"), (snapshot) => {
                 const newData = { "Cloneds": [], "Shiny": [], "Normais": [] };
@@ -83,7 +83,7 @@
             }
         };
 
-        // Importação em Lote para o Firebase (envia todos os 72 Pokémons sem travar por tamanho)
+        // Importação em Lote para o Firebase
         window.importBatchToFirebase = async function(jsonData) {
             try {
                 let batch = writeBatch(db);
@@ -389,7 +389,8 @@
         window.renderList = function() {
             const grid = document.getElementById('pokemonGrid');
             const emptyState = document.getElementById('emptyState');
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
             
             grid.innerHTML = '';
             let total = 0, cloned = 0, shiny = 0, normal = 0;
@@ -461,17 +462,26 @@
                 });
             });
 
-            document.getElementById('statTotal').innerText = total;
-            document.getElementById('statCloned').innerText = cloned;
-            document.getElementById('statShiny').innerText = shiny;
-            document.getElementById('statNormal').innerText = normal;
+            const statTotal = document.getElementById('statTotal');
+            const statCloned = document.getElementById('statCloned');
+            const statShiny = document.getElementById('statShiny');
+            const statNormal = document.getElementById('statNormal');
+
+            if(statTotal) statTotal.innerText = total;
+            if(statCloned) statCloned.innerText = cloned;
+            if(statShiny) statShiny.innerText = shiny;
+            if(statNormal) statNormal.innerText = normal;
 
             if (displayedCount === 0) {
-                emptyState.classList.remove('hidden');
-                emptyState.classList.add('flex');
+                if(emptyState) {
+                    emptyState.classList.remove('hidden');
+                    emptyState.classList.add('flex');
+                }
             } else {
-                emptyState.classList.remove('flex');
-                emptyState.classList.add('hidden');
+                if(emptyState) {
+                    emptyState.classList.remove('flex');
+                    emptyState.classList.add('hidden');
+                }
             }
         }
 
@@ -630,6 +640,134 @@
                 alert("Nuvem limpa!");
             }
         }
+
+        window.toBase64 = function(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        window.processBatchImport = async function() {
+            const category = document.getElementById('autoCategory').value;
+            const rawText = document.getElementById('autoTextList').value.trim();
+            const spriteFiles = document.getElementById('batchSpriteFiles').files;
+            const ballFiles = document.getElementById('batchBallFiles').files;
+
+            if (!rawText) {
+                alert("Por favor, insira a lista de nomenclaturas.");
+                return;
+            }
+
+            const btnProcess = document.querySelector("#autoModal button[onclick='processBatchImport()']");
+            if(btnProcess) {
+                btnProcess.disabled = true;
+                btnProcess.innerText = "A processar imagens...";
+            }
+
+            try {
+                const ballMap = {};
+                for (let file of ballFiles) {
+                    const base64 = await toBase64(file);
+                    const cleanName = file.name.substring(0, file.name.lastIndexOf('.')).toLowerCase().replace(/[^a-z0-9]/g, '');
+                    ballMap[cleanName] = base64;
+                }
+
+                const spriteMap = {};
+                for (let file of spriteFiles) {
+                    const base64 = await toBase64(file);
+                    const cleanName = file.name.substring(0, file.name.lastIndexOf('.')).toLowerCase().replace(/[^a-z0-9]/g, '');
+                    spriteMap[cleanName] = base64;
+                }
+
+                const lines = rawText.split('\n');
+                let addedCount = 0;
+
+                for (let line of lines) {
+                    line = line.trim();
+                    if (!line) continue;
+
+                    let title = line;
+                    let ability = "";
+                    let details = "";
+                    let ballName = "POKEBALL";
+                    let detectedBallKeys = [];
+
+                    let cleanLine = line.replace(/^([a-z\s]+)\./i, '$1 ');
+                    const lowerLine = cleanLine.toLowerCase();
+
+                    if (lowerLine.includes('yellow pokeball')) { ballName = 'YELLOW POKEBALL'; detectedBallKeys = ['yellow', 'poke']; }
+                    else if (lowerLine.includes('rocket')) { ballName = 'ROCKET BALL'; detectedBallKeys = ['rocket', 'rock']; }
+                    else if (lowerLine.includes('aqua')) { ballName = 'AQUA POKEBALL'; detectedBallKeys = ['aqua']; }
+                    else if (lowerLine.includes('moon')) { ballName = 'MOON BALL'; detectedBallKeys = ['moon']; }
+                    else if (lowerLine.includes('heavy')) { ballName = 'HEAVY BALL'; detectedBallKeys = ['heavy']; }
+                    else if (lowerLine.includes('premier')) { ballName = 'PREMIER BALL'; detectedBallKeys = ['premier']; }
+                    else if (lowerLine.includes('ultra')) { ballName = 'ULTRA BALL'; detectedBallKeys = ['ultra']; }
+                    else if (lowerLine.includes('great')) { ballName = 'GREAT BALL'; detectedBallKeys = ['great']; }
+                    else if (lowerLine.includes('master')) { ballName = 'MASTER BALL'; detectedBallKeys = ['master']; }
+                    else if (lowerLine.includes('repeat')) { ballName = 'REPEAT BALL'; detectedBallKeys = ['repeat']; }
+                    else { ballName = 'POKEBALL'; detectedBallKeys = ['poke', 'normal']; }
+
+                    title = cleanLine.replace(/^(ultra ball|repeat ball|yellow pokeball|rocket ball|aqua ball|moon ball|heavy ball|premier ball|great ball|master ball)\.?\s*/i, '');
+
+                    if (title.includes("Ability:")) {
+                        const parts = title.split("Ability:");
+                        title = parts[0].trim();
+                        const rest = parts[1].trim();
+                        const restParts = rest.split(/TM:|Items:/i);
+                        ability = "Ability: " + restParts[0].trim();
+                        if (restParts.length > 1) {
+                            details = restParts.slice(1).map(tm => "TM: " + tm.trim()).join('\n');
+                        }
+                    }
+
+                    let foundSprite = "";
+                    const searchKeyPoke = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    for (let key in spriteMap) {
+                        if (searchKeyPoke.includes(key) || (key.length >= 4 && searchKeyPoke.includes(key.substring(0, 5)))) {
+                            foundSprite = spriteMap[key];
+                            break;
+                        }
+                    }
+
+                    let foundBall = "";
+                    for (let bKey of detectedBallKeys) {
+                        for (let key in ballMap) {
+                            if (key.includes(bKey)) {
+                                foundBall = ballMap[key];
+                                break;
+                            }
+                        }
+                        if (foundBall) break;
+                    }
+
+                    const newItem = {
+                        title: title,
+                        ability: ability,
+                        details: details,
+                        ballName: ballName,
+                        sprite: foundSprite,
+                        ballImg: foundBall
+                    };
+
+                    await window.saveSinglePokemonToFirebase(category, newItem);
+                    addedCount++;
+                }
+
+                closeAutoModal();
+                alert(`${addedCount} registos processados e salvos na nuvem com sucesso!`);
+            } catch (error) {
+                console.error("Erro na importação em massa: ", error);
+                alert("Ocorreu um erro ao processar os ficheiros: " + error.message);
+            } finally {
+                if(btnProcess) {
+                    btnProcess.disabled = false;
+                    btnProcess.innerText = "Processar e Vincular Automaticamente";
+                }
+            }
+        };
     </script>
 </body>
 </html>
