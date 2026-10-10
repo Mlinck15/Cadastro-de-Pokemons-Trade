@@ -25,6 +25,9 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // NOME DA COLEÇÃO CORRIGIDO PARA CORRESPONDER AO FIREBASE
+        const COLLECTION_NAME = "TradePokesOficial";
+
         window.currentData = {
             "Cloneds": [],
             "Shiny": [],
@@ -33,12 +36,11 @@
         window.currentCategory = 'all';
 
         function listenToFirebase() {
-            onSnapshot(collection(db, "pokemons_v2"), (snapshot) => {
+            onSnapshot(collection(db, COLLECTION_NAME), (snapshot) => {
                 const newData = { "Cloneds": [], "Shiny": [], "Normais": [] };
                 
                 snapshot.forEach((docSnap) => {
                     const data = docSnap.data();
-                    // Ignora o documento de teste se existir
                     if(data.title === "Teste") return;
                     
                     const cat = data.category || "Normais";
@@ -55,7 +57,6 @@
                 }
             }, (error) => {
                 console.error("Erro ao sincronizar com o Firebase: ", error);
-                alert("Erro de conexão com o Firebase: " + error.message);
             });
         }
 
@@ -67,7 +68,7 @@
                 for (let p of itemsArray) {
                     const cat = p.category || "Normais";
                     const docId = p.id || `${cat}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-                    const ref = doc(db, "pokemons_v2", docId);
+                    const ref = doc(db, COLLECTION_NAME, docId);
                     
                     batch.set(ref, { ...p, category: cat, id: docId });
                     count++;
@@ -87,11 +88,23 @@
             }
         };
 
+        window.saveSinglePokemonToFirebase = async function(category, pokemonObj) {
+            try {
+                const docId = pokemonObj.id || `${category}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+                const ref = doc(db, COLLECTION_NAME, docId);
+                const dataToSave = { ...pokemonObj, category: category, id: docId };
+                await setDoc(ref, dataToSave);
+            } catch (error) {
+                console.error("Erro ao salvar no Firebase: ", error);
+                alert("Erro ao salvar no Firebase: " + error.message);
+            }
+        };
+
         window.deletePokemonFromFirebase = async function(category, index) {
             try {
                 const item = window.currentData[category][index];
                 if (item && item.id) {
-                    await deleteDoc(doc(db, "pokemons_v2", item.id));
+                    await deleteDoc(doc(db, COLLECTION_NAME, item.id));
                 }
             } catch (error) {
                 console.error("Erro ao excluir do Firebase: ", error);
@@ -100,7 +113,7 @@
 
         window.clearFirebaseData = async function() {
             try {
-                const snapshot = await getDocs(collection(db, "pokemons_v2"));
+                const snapshot = await getDocs(collection(db, COLLECTION_NAME));
                 let batch = writeBatch(db);
                 let count = 0;
                 snapshot.forEach((docSnap) => {
@@ -579,18 +592,6 @@
                 finalizeSave(null, null);
             }
         }
-
-        window.saveSinglePokemonToFirebase = async function(category, pokemonObj) {
-            try {
-                const docId = pokemonObj.id || `${category}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-                const ref = doc(db, "pokemons_v2", docId);
-                const dataToSave = { ...pokemonObj, category: category, id: docId };
-                await setDoc(ref, dataToSave);
-            } catch (error) {
-                console.error("Erro ao salvar no Firebase: ", error);
-                alert("Erro ao salvar no Firebase: " + error.message);
-            }
-        };
 
         window.deletePokemon = async function(category, index) {
             if (confirm("Deseja realmente vender/excluir este registro?")) {
