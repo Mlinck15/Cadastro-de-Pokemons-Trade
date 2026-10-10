@@ -627,7 +627,7 @@
                         alert("Arquivo JSON inválido.");
                     }
                 } catch (err) {
-                    alert("Erro ao ler o arquivo JSON.");
+                    alert("Erro ao ler o arquivo JSON: " + err.message);
                 }
             };
             reader.readAsText(file);
@@ -746,26 +746,3 @@
                     itemsToBatch.push({
                         category: category,
                         title: title,
-                        ability: ability,
-                        details: details,
-                        ballName: ballName,
-                        sprite: foundSprite,
-                        ballImg: foundBall
-                    });
-                }
-
-                await importBatchToFirebase(itemsToBatch);
-                closeAutoModal();
-            } catch (error) {
-                console.error("Erro na importação em massa: ", error);
-                alert("Ocorreu um erro ao processar os ficheiros: " + error.message);
-            } finally {
-                if(btnProcess) {
-                    btnProcess.disabled = false;
-                    btnProcess.innerText = "Processar e Vincular Automaticamente";
-                }
-            }
-        };
-    </script>
-</body>
-</html>
