@@ -37,62 +37,28 @@
         function listenToFirebase() {
             onSnapshot(collection(db, COLLECTION_NAME), (snapshot) => {
                 const newData = { "Cloneds": [], "Shiny": [], "Normais": [] };
-                let count = 0;
                 
                 snapshot.forEach((docSnap) => {
                     const data = docSnap.data();
-                    if(data.title === "Teste") return;
-                    
                     const cat = data.category || "Normais";
                     if (!newData[cat]) newData[cat] = [];
                     newData[cat].push({
                         id: docSnap.id,
                         ...data
                     });
-                    count++;
                 });
 
                 window.currentData = newData;
                 if (typeof window.renderList === 'function') {
                     window.renderList();
                 }
-
-                // Se o Firebase estiver totalmente vazio, tenta carregar automaticamente o ficheiro local TradePokesOficial.json
-                if (count === 0 && !window.hasAutoImported) {
-                    window.hasAutoImported = true;
-                    loadLocalJsonAutomatically();
-                }
             }, (error) => {
                 console.error("Erro no Firebase: ", error);
-                alert("Erro ao conectar ao Firebase: " + error.message + "\n\nVerifique se as Regras do Firestore estão abertas.");
+                alert("Erro ao conectar ao Firebase: " + error.message);
             });
         }
 
-        async function loadLocalJsonAutomatically() {
-            try {
-                const response = await fetch('./TradePokesOficial.json');
-                if (!response.ok) return;
-                const parsed = await response.json();
-                
-                if (parsed && typeof parsed === 'object') {
-                    let flatArray = [];
-                    for(let cat of Object.keys(parsed)) {
-                        if(Array.isArray(parsed[cat])) {
-                            parsed[cat].forEach(item => {
-                                flatArray.push({ ...item, category: cat });
-                            });
-                        }
-                    }
-                    if (flatArray.length > 0) {
-                        await window.importBatchToFirebase(flatArray, true);
-                    }
-                }
-            } catch (err) {
-                console.log("Não foi possível carregar o JSON local automaticamente:", err);
-            }
-        }
-
-        window.importBatchToFirebase = async function(itemsArray, isSilent = false) {
+        window.importBatchToFirebase = async function(itemsArray) {
             try {
                 let batch = writeBatch(db);
                 let count = 0;
@@ -113,12 +79,10 @@
                 if (count % 400 !== 0) {
                     await batch.commit();
                 }
-                if (!isSilent) {
-                    alert(`${count} Pokémons importados com sucesso!`);
-                }
+                alert(`${count} Pokémons importados para a nuvem com sucesso!`);
             } catch (error) {
                 console.error("Erro na importação: ", error);
-                alert("ERRO DE PERMISSÃO OU GRAVAÇÃO:\n" + error.message + "\n\nSe o erro for 'Permission Denied', atualize as Regras no painel do Firebase!");
+                alert("Erro ao gravar no Firebase: " + error.message);
             }
         };
 
@@ -142,6 +106,7 @@
                 }
             } catch (error) {
                 console.error("Erro ao excluir do Firebase: ", error);
+                alert("Erro ao excluir: " + error.message);
             }
         };
 
@@ -283,7 +248,7 @@
                 <i class="fa-solid fa-ghost"></i>
             </div>
             <h3 class="text-lg font-bold text-white">Nenhum Pokémon encontrado</h3>
-            <p class="text-sm text-slate-400 mt-1">Carregando dados...</p>
+            <p class="text-sm text-slate-400 mt-1">Clique em "Importar" para enviar seu arquivo TradePokesOficial.json para a nuvem.</p>
         </div>
 
     </main>
