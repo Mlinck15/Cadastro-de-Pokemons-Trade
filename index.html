@@ -598,7 +598,7 @@
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.currentData, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "pokemons.json");
+            downloadAnchor.setAttribute("download", "TradePokesOficial.json");
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
@@ -746,3 +746,26 @@
                     itemsToBatch.push({
                         category: category,
                         title: title,
+                        ability: ability,
+                        details: details,
+                        ballName: ballName,
+                        sprite: foundSprite,
+                        ballImg: foundBall
+                    });
+                }
+
+                await importBatchToFirebase(itemsToBatch);
+                closeAutoModal();
+            } catch (error) {
+                console.error("Erro na importação em massa: ", error);
+                alert("Ocorreu um erro ao processar os ficheiros: " + error.message);
+            } finally {
+                if(btnProcess) {
+                    btnProcess.disabled = false;
+                    btnProcess.innerText = "Processar e Vincular Automaticamente";
+                }
+            }
+        };
+    </script>
+</body>
+</html>
