@@ -10,10 +10,10 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         // ==========================================
-        // COLE SUA CONFIGURAÇÃO DO FIREBASE ABAIXO:
+        // COLE A SUA CONFIGURAÇÃO DO FIREBASE ABAIXO:
         // ==========================================
         const firebaseConfig = {
             apiKey: "SUA_API_KEY",
@@ -28,41 +28,108 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        const defaultRawData = {
+        window.currentData = {
             "Cloneds": [],
             "Shiny": [],
             "Normais": []
         };
-
-        window.currentData = JSON.parse(JSON.stringify(defaultRawData));
         window.currentCategory = 'all';
 
-        // Função para salvar no Firebase (Sincroniza na Nuvem)
-        window.saveDataToFirebase = async function() {
-            try {
-                await setDoc(doc(db, "padventures", "main_collection"), window.currentData);
-            } catch (error) {
-                console.error("Erro ao salvar no Firebase: ", error);
-            }
-        };
-
-        // Ouve atualizações em tempo real vindas da nuvem
+        // Escuta as alterações na nuvem em tempo real (documentos separados para ultrapassar o limite de 1MB)
         function listenToFirebase() {
-            onSnapshot(doc(db, "padventures", "main_collection"), (docSnap) => {
-                if (docSnap.exists()) {
-                    window.currentData = docSnap.data();
-                    renderList();
-                } else {
-                    // Se estiver vazio na nuvem, salva o padrão inicial
-                    saveDataToFirebase();
-                    renderList();
-                }
+            onSnapshot(collection(db, "pokemons_v2"), (snapshot) => {
+                const newData = { "Cloneds": [], "Shiny": [], "Normais": [] };
+                
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const cat = data.category || "Normais";
+                    if (!newData[cat]) newData[cat] = [];
+                    newData[cat].push({
+                        id: docSnap.id,
+                        ...data
+                    });
+                });
+
+                window.currentData = newData;
+                if (window.renderList) window.renderList();
             }, (error) => {
-                console.error("Erro ao escutar dados: ", error);
+                console.error("Erro ao sincronizar com o Firebase: ", error);
             });
         }
 
-        // Inicializa ouvindo o Firebase ao carregar a página
+        // Função para gravar/atualizar um pokémon individualmente na nuvem
+        window.saveSinglePokemonToFirebase = async function(category, pokemonObj) {
+            try {
+                const docId = pokemonObj.id || `${category}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+                const ref = doc(db, "pokemons_v2", docId);
+                const dataToSave = { ...pokemonObj, category: category, id: docId };
+                await setDoc(ref, dataToSave);
+            } catch (error) {
+                console.error("Erro ao salvar no Firebase: ", error);
+                alert("Erro ao salvar no Firebase: " + error.message);
+            }
+        };
+
+        // Função para apagar um pokémon da nuvem
+        window.deletePokemonFromFirebase = async function(category, index) {
+            try {
+                const item = window.currentData[category][index];
+                if (item && item.id) {
+                    await deleteDoc(doc(db, "pokemons_v2", item.id));
+                }
+            } catch (error) {
+                console.error("Erro ao excluir do Firebase: ", error);
+            }
+        };
+
+        // Importação em Lote para o Firebase (envia todos os 72 Pokémons sem travar por tamanho)
+        window.importBatchToFirebase = async function(jsonData) {
+            try {
+                let batch = writeBatch(db);
+                let count = 0;
+
+                for (let cat of Object.keys(jsonData)) {
+                    if (Array.isArray(jsonData[cat])) {
+                        for (let p of jsonData[cat]) {
+                            const docId = `${cat}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+                            const ref = doc(db, "pokemons_v2", docId);
+                            batch.set(ref, { ...p, category: cat, id: docId });
+                            count++;
+
+                            // O Firebase permite no máximo 500 operações por Lote
+                            if (count % 400 === 0) {
+                                await batch.commit();
+                                batch = writeBatch(db);
+                            }
+                        }
+                    }
+                }
+                if (count % 400 !== 0) {
+                    await batch.commit();
+                }
+                alert(`${count} Pokémons importados para a nuvem com sucesso!`);
+            } catch (error) {
+                console.error("Erro na importação em massa: ", error);
+                alert("Erro ao importar para a nuvem: " + error.message);
+            }
+        };
+
+        // Limpa toda a base de dados da nuvem
+        window.clearFirebaseData = async function() {
+            try {
+                const snapshot = await getDocs(collection(db, "pokemons_v2"));
+                let batch = writeBatch(db);
+                let count = 0;
+                snapshot.forEach((docSnap) => {
+                    batch.delete(docSnap.ref);
+                    count++;
+                });
+                if (count > 0) await batch.commit();
+            } catch (error) {
+                console.error("Erro ao limpar nuvem: ", error);
+            }
+        };
+
         listenToFirebase();
     </script>
 
@@ -102,7 +169,7 @@
                     <i class="fa-solid fa-upload"></i> Importar
                     <input type="file" id="importFile" accept=".json" onchange="importData(event)" class="hidden">
                 </label>
-                <button onclick="resetToDefault()" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-rose-900/50 cursor-pointer" title="Restaurar Lista Original">
+                <button onclick="resetToDefault()" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-rose-900/50 cursor-pointer" title="Limpar Nuvem">
                     <i class="fa-solid fa-rotate-right"></i>
                 </button>
             </div>
@@ -186,7 +253,7 @@
                 <i class="fa-solid fa-ghost"></i>
             </div>
             <h3 class="text-lg font-bold text-white">Nenhum Pokémon encontrado</h3>
-            <p class="text-sm text-slate-400 mt-1">Tente ajustar sua busca ou adicione um novo Pokémon.</p>
+            <p class="text-sm text-slate-400 mt-1">Tente importar sua base JSON para a nuvem.</p>
         </div>
 
     </main>
@@ -248,7 +315,7 @@
 
                 <div class="flex justify-end gap-3 mt-4">
                     <button type="button" onclick="closeModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">Cancelar</button>
-                    <button type="submit" class="bg-rose-600 hover:bg-rose-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow-lg shadow-rose-600/20 cursor-pointer">Salvar</button>
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow-lg shadow-rose-600/20 cursor-pointer">Salvar na Nuvem</button>
                 </div>
             </form>
         </div>
@@ -466,14 +533,18 @@
 
             let existingSprite = "";
             let existingBallImg = "";
+            let existingId = null;
 
             if (editCategory !== "" && editIndex !== "") {
-                existingSprite = window.currentData[editCategory][editIndex].sprite || "";
-                existingBallImg = window.currentData[editCategory][editIndex].ballImg || "";
+                const oldItem = window.currentData[editCategory][editIndex];
+                existingSprite = oldItem.sprite || "";
+                existingBallImg = oldItem.ballImg || "";
+                existingId = oldItem.id || null;
             }
 
-            const finalizeSave = (spriteBase64, ballBase64) => {
+            const finalizeSave = async (spriteBase64, ballBase64) => {
                 const newItem = {
+                    id: existingId,
                     title: title,
                     ability: ability,
                     details: details,
@@ -482,16 +553,7 @@
                     ballImg: ballBase64 || existingBallImg
                 };
 
-                if (editCategory !== "" && editIndex !== "") {
-                    window.currentData[editCategory].splice(editIndex, 1);
-                    if (!window.currentData[category]) window.currentData[category] = [];
-                    window.currentData[category].push(newItem);
-                } else {
-                    if (!window.currentData[category]) window.currentData[category] = [];
-                    window.currentData[category].push(newItem);
-                }
-
-                saveDataToFirebase();
+                await saveSinglePokemonToFirebase(category, newItem);
                 closeModal();
             };
 
@@ -524,10 +586,9 @@
             }
         }
 
-        window.deletePokemon = function(category, index) {
+        window.deletePokemon = async function(category, index) {
             if (confirm("Deseja realmente vender/excluir este registro?")) {
-                window.currentData[category].splice(index, 1);
-                saveDataToFirebase();
+                await deletePokemonFromFirebase(category, index);
             }
         }
 
@@ -545,13 +606,13 @@
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     const parsed = JSON.parse(e.target.result);
                     if (parsed && typeof parsed === 'object') {
-                        window.currentData = parsed;
-                        saveDataToFirebase();
-                        alert("Dados importados para a nuvem com sucesso!");
+                        if (confirm("Deseja importar estes Pokémons para a nuvem?")) {
+                            await importBatchToFirebase(parsed);
+                        }
                     } else {
                         alert("Arquivo JSON inválido.");
                     }
@@ -563,10 +624,10 @@
             event.target.value = '';
         }
 
-        window.resetToDefault = function() {
-            if (confirm("Deseja restaurar a base vazia?")) {
-                window.currentData = { "Cloneds": [], "Shiny": [], "Normais": [] };
-                saveDataToFirebase();
+        window.resetToDefault = async function() {
+            if (confirm("Deseja limpar todos os Pokémons salvos na nuvem?")) {
+                await clearFirebaseData();
+                alert("Nuvem limpa!");
             }
         }
     </script>
