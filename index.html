@@ -205,7 +205,7 @@
             </div>
             <div class="p-6 flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
                 <p class="text-xs text-slate-300 leading-relaxed">
-                    Cole sua lista de nomenclaturas abaixo (ex: <code class="text-indigo-300">X rocket ball. Cloned Electivire [...]</code>). O sistema vai ler qual é a pokébola de cada linha e buscar a imagem correspondente na sua seleção de balls.
+                    Cole sua lista de nomenclaturas abaixo. O sistema fará a leitura de cada linha, identificará a pokébola correta e fará o vínculo automático das imagens de forma individual.
                 </p>
 
                 <div>
@@ -226,12 +226,10 @@
                     <div>
                         <label class="block text-xs font-medium text-cyan-400 mb-1"><i class="fa-solid fa-dragon"></i> Fotos dos Pokémons (Sprites)</label>
                         <input type="file" id="batchSpriteFiles" accept="image/*" multiple class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300">
-                        <p class="text-[10px] text-slate-500 mt-1">Ex: electivire.png, vaporeon.png</p>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-amber-400 mb-1"><i class="fa-solid fa-baseball"></i> Fotos das Pokébolas (Balls)</label>
                         <input type="file" id="batchBallFiles" accept="image/*" multiple class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300">
-                        <p class="text-[10px] text-slate-500 mt-1">Ex: rocket_ball.png, moon_ball.png</p>
                     </div>
                 </div>
 
@@ -260,6 +258,22 @@
             if (saved) {
                 try { return JSON.parse(saved); } catch(e) {}
             }
+            
+            // Tenta carregar automaticamente o arquivo pokemons.json do GitHub Pages
+            fetch('pokemons.json')
+                .then(response => {
+                    if (!response.ok) throw new Error('Arquivo não encontrado');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && typeof data === 'object') {
+                        currentData = data;
+                        saveData();
+                        renderList();
+                    }
+                })
+                .catch(err => console.log('Usando base vazia padrão.'));
+
             return JSON.parse(JSON.stringify(defaultRawData));
         }
 
@@ -488,7 +502,7 @@
             }
         }
 
-        // Processamento em massa corrigido para cruzar corretamente a ball específica de cada linha
+        // Processamento em massa robusto para associar a Pokébola correta e o Sprite correto linha por linha
         async function processBatchImport() {
             const category = document.getElementById('autoCategory').value;
             const rawText = document.getElementById('autoTextList').value.trim();
@@ -508,7 +522,7 @@
                 spriteMap[cleanName] = base64;
             }
 
-            // Mapeia Balls por nome do arquivo (ex: "rocketball", "moonball", "aquapokeball")
+            // Mapeia Balls
             const ballMap = {};
             for (let file of ballFiles) {
                 const base64 = await toBase64(file);
@@ -529,39 +543,32 @@
                 let ability = "";
                 let details = "";
                 let ballName = "POKEBALL";
-                let detectedBallKey = "";
+                let detectedBallKeys = [];
 
                 const lowerLine = line.toLowerCase();
 
-                // Extração inteligente do tipo de Ball baseado no texto da linha (ex: "X rocket ball.")
-                if (lowerLine.includes('rocket ball') || lowerLine.includes('rocketball')) {
-                    ballName = 'ROCKET BALL';
-                    detectedBallKey = 'rocket';
-                } else if (lowerLine.includes('aqua pokeball') || lowerLine.includes('aquapokeball')) {
-                    ballName = 'AQUA POKEBALL';
-                    detectedBallKey = 'aqua';
-                } else if (lowerLine.includes('moon ball') || lowerLine.includes('moonball')) {
-                    ballName = 'MOON BALL';
-                    detectedBallKey = 'moon';
-                } else if (lowerLine.includes('heavy ball') || lowerLine.includes('heavyball')) {
-                    ballName = 'HEAVY BALL';
-                    detectedBallKey = 'heavy';
-                } else if (lowerLine.includes('premier ball') || lowerLine.includes('premierball')) {
-                    ballName = 'PREMIER BALL';
-                    detectedBallKey = 'premier';
-                } else if (lowerLine.includes('ultra ball') || lowerLine.includes('ultraball')) {
-                    ballName = 'ULTRA BALL';
-                    detectedBallKey = 'ultra';
-                } else if (lowerLine.includes('great ball') || lowerLine.includes('greatball')) {
-                    ballName = 'GREAT BALL';
-                    detectedBallKey = 'great';
-                } else if (lowerLine.includes('master ball') || lowerLine.includes('masterball')) {
-                    ballName = 'MASTER BALL';
-                    detectedBallKey = 'master';
-                } else if (lowerLine.includes('pokeball')) {
-                    ballName = 'POKEBALL';
-                    detectedBallKey = 'poke';
-                }
+                // Identifica a Pokébola específica mencionada na linha
+                if (lowerLine.includes('rocket')) { ballName = 'ROCKET BALL'; detectedBallKeys = ['rocket', 'rock']; }
+                else if (lowerLine.includes('aqua')) { ballName = 'AQUA POKEBALL'; detectedBallKeys = ['aqua']; }
+                else if (lowerLine.includes('moon')) { ballName = 'MOON BALL'; detectedBallKeys = ['moon']; }
+                else if (lowerLine.includes('heavy')) { ballName = 'HEAVY BALL'; detectedBallKeys = ['heavy']; }
+                else if (lowerLine.includes('premier')) { ballName = 'PREMIER BALL'; detectedBallKeys = ['premier']; }
+                else if (lowerLine.includes('ultra')) { ballName = 'ULTRA BALL'; detectedBallKeys = ['ultra']; }
+                else if (lowerLine.includes('great')) { ballName = 'GREAT BALL'; detectedBallKeys = ['great']; }
+                else if (lowerLine.includes('master')) { ballName = 'MASTER BALL'; detectedBallKeys = ['master']; }
+                else if (lowerLine.includes('fast')) { ballName = 'FAST BALL'; detectedBallKeys = ['fast']; }
+                else if (lowerLine.includes('sport')) { ballName = 'SPORT BALL'; detectedBallKeys = ['sport']; }
+                else if (lowerLine.includes('nest')) { ballName = 'NEST BALL'; detectedBallKeys = ['nest']; }
+                else if (lowerLine.includes('repeat')) { ballName = 'REPEAT BALL'; detectedBallKeys = ['repeat']; }
+                else if (lowerLine.includes('timer')) { ballName = 'TIMER BALL'; detectedBallKeys = ['timer']; }
+                else if (lowerLine.includes('luxury')) { ballName = 'LUXURY BALL'; detectedBallKeys = ['luxury']; }
+                else if (lowerLine.includes('friend')) { ballName = 'FRIEND BALL'; detectedBallKeys = ['friend']; }
+                else if (lowerLine.includes('love')) { ballName = 'LOVE BALL'; detectedBallKeys = ['love']; }
+                else if (lowerLine.includes('level')) { ballName = 'LEVEL BALL'; detectedBallKeys = ['level']; }
+                else if (lowerLine.includes('lure')) { ballName = 'LURE BALL'; detectedBallKeys = ['lure']; }
+                else if (lowerLine.includes('beast')) { ballName = 'BEAST BALL'; detectedBallKeys = ['beast']; }
+                else if (lowerLine.includes('cherish')) { ballName = 'CHERISH BALL'; detectedBallKeys = ['cherish']; }
+                else { ballName = 'POKEBALL'; detectedBallKeys = ['poke', 'normal']; }
 
                 if (line.includes("Ability:")) {
                     const parts = line.split("Ability:");
@@ -574,7 +581,7 @@
                     }
                 }
 
-                // Busca Sprite correspondente ao Pokémon
+                // Busca o Sprite correto do Pokémon pelo nome
                 let foundSprite = "";
                 const searchKeyPoke = title.toLowerCase().replace(/[^a-z0-9]/g, '');
                 for (let key in spriteMap) {
@@ -584,19 +591,16 @@
                     }
                 }
 
-                // Busca Ball correspondente específica para esta linha
+                // Busca a imagem da Ball correta baseada nas chaves detetadas
                 let foundBall = "";
-                if (detectedBallKey) {
+                for (let bKey of detectedBallKeys) {
                     for (let key in ballMap) {
-                        if (key.includes(detectedBallKey)) {
+                        if (key.includes(bKey)) {
                             foundBall = ballMap[key];
                             break;
                         }
                     }
-                }
-                // Fallback: se não achar pela chave específica, pega a primeira ball disponível caso exista
-                if (!foundBall && Object.keys(ballMap).length > 0) {
-                    foundBall = Object.values(ballMap)[0];
+                    if (foundBall) break;
                 }
 
                 currentData[category].push({
@@ -637,7 +641,7 @@
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentData, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "padventures_pokemons.json");
+            downloadAnchor.setAttribute("download", "pokemons.json");
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
