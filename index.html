@@ -26,6 +26,17 @@
         const db = getFirestore(app);
 
         const COLLECTION_NAME = "TradePokesOficial";
+        const ADMIN_PASSWORD = "Shared@2026";
+
+        function verifyPassword() {
+            const pwd = prompt("Digite a senha de administrador para continuar:");
+            if (pwd === ADMIN_PASSWORD) {
+                return true;
+            } else if (pwd !== null) {
+                alert("Senha incorreta!");
+            }
+            return false;
+        }
 
         window.currentData = {
             "Cloneds": [],
@@ -54,11 +65,11 @@
                 }
             }, (error) => {
                 console.error("Erro no Firebase: ", error);
-                alert("Erro de conexão com o Firebase: " + error.message);
             });
         }
 
         window.importBatchToFirebase = async function(itemsArray) {
+            if (!verifyPassword()) return;
             try {
                 let batch = writeBatch(db);
                 let count = 0;
@@ -74,7 +85,6 @@
                     count++;
                     totalSaved++;
 
-                    // Commit a cada 100 itens para não estourar os limites do Firestore
                     if (count === 100) {
                         await batch.commit();
                         batch = writeBatch(db);
@@ -106,6 +116,7 @@
         };
 
         window.deletePokemonFromFirebase = async function(category, index) {
+            if (!verifyPassword()) return;
             try {
                 const item = window.currentData[category][index];
                 if (item && item.id) {
@@ -118,6 +129,7 @@
         };
 
         window.clearFirebaseData = async function() {
+            if (!verifyPassword()) return;
             try {
                 const snapshot = await getDocs(collection(db, COLLECTION_NAME));
                 let batch = writeBatch(db);
@@ -127,7 +139,7 @@
                     count++;
                 });
                 if (count > 0) await batch.commit();
-                alert("Nuvem limpa!");
+                alert("Nuvem limpa com sucesso!");
             } catch (error) {
                 console.error("Erro ao limpar nuvem: ", error);
             }
@@ -490,6 +502,13 @@
         }
 
         window.openAddModal = function() {
+            // Pede senha antes de abrir o modal de adicionar
+            const pwd = prompt("Digite a senha de administrador para adicionar um Pokémon:");
+            if (pwd !== "Shared@2026") {
+                if (pwd !== null) alert("Senha incorreta!");
+                return;
+            }
+
             document.getElementById('modalTitle').innerText = 'Adicionar Novo Pokémon';
             document.getElementById('editCategory').value = '';
             document.getElementById('editIndex').value = '';
@@ -503,6 +522,11 @@
         }
 
         window.openAutoModal = function() {
+            const pwd = prompt("Digite a senha de administrador para a importação automática:");
+            if (pwd !== "Shared@2026") {
+                if (pwd !== null) alert("Senha incorreta!");
+                return;
+            }
             document.getElementById('autoModal').classList.remove('hidden');
         }
 
@@ -601,9 +625,7 @@
         }
 
         window.deletePokemon = async function(category, index) {
-            if (confirm("Deseja realmente vender/excluir este registro?")) {
-                await deletePokemonFromFirebase(category, index);
-            }
+            await deletePokemonFromFirebase(category, index);
         }
 
         window.exportData = function() {
@@ -624,30 +646,25 @@
                 try {
                     const parsed = JSON.parse(e.target.result);
                     if (parsed && typeof parsed === 'object') {
-                        if (confirm("Deseja enviar estes Pokémons diretamente para o Firebase?")) {
-                            let flatArray = [];
-                            
-                            // Suporta tanto formato em categorias { Cloneds: [], Shiny: [], Normais: [] } 
-                            // quanto formato em lista simples [ {}, {} ]
-                            if (Array.isArray(parsed)) {
-                                flatArray = parsed;
-                            } else {
-                                for(let cat of Object.keys(parsed)) {
-                                    if(Array.isArray(parsed[cat])) {
-                                        parsed[cat].forEach(item => {
-                                            flatArray.push({ ...item, category: cat });
-                                        });
-                                    }
+                        let flatArray = [];
+                        if (Array.isArray(parsed)) {
+                            flatArray = parsed;
+                        } else {
+                            for(let cat of Object.keys(parsed)) {
+                                if(Array.isArray(parsed[cat])) {
+                                    parsed[cat].forEach(item => {
+                                        flatArray.push({ ...item, category: cat });
+                                    });
                                 }
                             }
-
-                            if (flatArray.length === 0) {
-                                alert("Nenhum registro válido foi encontrado dentro do arquivo JSON selecionado.");
-                                return;
-                            }
-
-                            await importBatchToFirebase(flatArray);
                         }
+
+                        if (flatArray.length === 0) {
+                            alert("Nenhum registro válido encontrado.");
+                            return;
+                        }
+
+                        await importBatchToFirebase(flatArray);
                     } else {
                         alert("Arquivo JSON inválido.");
                     }
@@ -660,9 +677,7 @@
         }
 
         window.resetToDefault = async function() {
-            if (confirm("Deseja limpar todos os Pokémons do Firebase?")) {
-                await clearFirebaseData();
-            }
+            await clearFirebaseData();
         }
 
         window.toBase64 = function(file) {
