@@ -29,7 +29,7 @@
         const ADMIN_PASSWORD = "Shared@2026";
 
         function verifyPassword() {
-            const pwd = prompt("Digite a senha de administrador (Shared@2026):");
+            const pwd = prompt("Digite a senha de administrador:");
             if (pwd === ADMIN_PASSWORD) {
                 return true;
             } else if (pwd !== null) {
@@ -116,7 +116,7 @@
         };
 
         window.deletePokemonFromFirebase = async function(category, index) {
-            if (!verifyPassword()) return; // Pede senha aqui
+            if (!verifyPassword()) return;
             try {
                 const item = window.currentData[category][index];
                 if (item && item.id) {
@@ -130,7 +130,7 @@
         };
 
         window.clearFirebaseData = async function() {
-            if (!verifyPassword()) return; // Pede senha aqui
+            if (!verifyPassword()) return;
             try {
                 const snapshot = await getDocs(collection(db, COLLECTION_NAME));
                 let batch = writeBatch(db);
@@ -503,7 +503,7 @@
         }
 
         window.openAddModal = function() {
-            const pwd = prompt("Digite a senha de administrador (Shared@2026):");
+            const pwd = prompt("Digite a senha de administrador:");
             if (pwd !== "Shared@2026") {
                 if (pwd !== null) alert("Senha incorreta!");
                 return;
@@ -522,7 +522,7 @@
         }
 
         window.openAutoModal = function() {
-            const pwd = prompt("Digite a senha de administrador (Shared@2026):");
+            const pwd = prompt("Digite a senha de administrador:");
             if (pwd !== "Shared@2026") {
                 if (pwd !== null) alert("Senha incorreta!");
                 return;
