@@ -28,14 +28,32 @@
         const COLLECTION_NAME = "TradePokesOficial";
         const ADMIN_PASSWORD = "Shared@2026";
 
-        function verifyPassword() {
-            const pwd = prompt("Digite a senha de administrador:");
-            if (pwd === ADMIN_PASSWORD) {
-                return true;
-            } else if (pwd !== null) {
+        let pendingAction = null;
+
+        window.requestAdminAuth = function(actionCallback) {
+            pendingAction = actionCallback;
+            document.getElementById('adminPasswordInput').value = '';
+            document.getElementById('authModal').classList.remove('hidden');
+        }
+
+        window.closeAuthModal = function() {
+            pendingAction = null;
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        window.confirmAdminAuth = function() {
+            const enteredPassword = document.getElementById('adminPasswordInput').value;
+            if (enteredPassword === ADMIN_PASSWORD) {
+                document.getElementById('authModal').classList.add('hidden');
+                if (pendingAction) {
+                    const action = pendingAction;
+                    pendingAction = null;
+                    action();
+                }
+            } else {
                 alert("Senha incorreta!");
+                document.getElementById('adminPasswordInput').value = '';
             }
-            return false;
         }
 
         window.currentData = {
@@ -69,7 +87,6 @@
         }
 
         window.importBatchToFirebase = async function(itemsArray) {
-            if (!verifyPassword()) return;
             try {
                 let batch = writeBatch(db);
                 let count = 0;
@@ -116,7 +133,6 @@
         };
 
         window.deletePokemonFromFirebase = async function(category, index) {
-            if (!verifyPassword()) return;
             try {
                 const item = window.currentData[category][index];
                 if (item && item.id) {
@@ -130,7 +146,6 @@
         };
 
         window.clearFirebaseData = async function() {
-            if (!verifyPassword()) return;
             try {
                 const snapshot = await getDocs(collection(db, COLLECTION_NAME));
                 let batch = writeBatch(db);
@@ -172,10 +187,10 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <button onclick="openAutoModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer">
+                <button onclick="requestAdminAuth(() => openAutoModal())" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Importação Automática
                 </button>
-                <button onclick="openAddModal()" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-rose-600/20 cursor-pointer">
+                <button onclick="requestAdminAuth(() => openAddModal())" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-rose-600/20 cursor-pointer">
                     <i class="fa-solid fa-plus"></i> Novo Pokémon
                 </button>
                 <button onclick="exportData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-slate-700 cursor-pointer">
@@ -183,9 +198,9 @@
                 </button>
                 <label class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-slate-700 cursor-pointer">
                     <i class="fa-solid fa-upload"></i> Importar
-                    <input type="file" id="importFile" accept=".json" onchange="importData(event)" class="hidden">
+                    <input type="file" id="importFile" accept=".json" onchange="requestAdminAuth(() => importData(event))" class="hidden">
                 </label>
-                <button onclick="resetToDefault()" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-rose-900/50 cursor-pointer" title="Limpar Nuvem">
+                <button onclick="requestAdminAuth(() => resetToDefault())" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-rose-900/50 cursor-pointer" title="Limpar Nuvem">
                     <i class="fa-solid fa-rotate-right"></i>
                 </button>
             </div>
@@ -273,6 +288,25 @@
         </div>
 
     </main>
+
+    <!-- Modal de Autenticação / Senha Segura -->
+    <div id="authModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 flex flex-col gap-4">
+            <div class="flex items-center gap-3 text-rose-500">
+                <i class="fa-solid fa-lock text-xl"></i>
+                <h3 class="text-lg font-bold text-white">Acesso Restrito</h3>
+            </div>
+            <p class="text-xs text-slate-300">Esta ação requer a senha de administrador para continuar.</p>
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Palavra-passe</label>
+                <input type="password" id="adminPasswordInput" placeholder="Digite a senha..." onkeydown="if(event.key === 'Enter') confirmAdminAuth()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-rose-500">
+            </div>
+            <div class="flex justify-end gap-2 mt-2">
+                <button type="button" onclick="closeAuthModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-xs font-medium transition cursor-pointer">Cancelar</button>
+                <button type="button" onclick="confirmAdminAuth()" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition shadow-lg shadow-rose-600/20 cursor-pointer">Confirmar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal de Cadastro / Edição Individual -->
     <div id="pokemonModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
@@ -467,10 +501,10 @@
                         </div>
                         
                         <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                            <button onclick="openEditModal('${cat}', ${index})" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-1.5 px-3 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer">
+                            <button onclick="requestAdminAuth(() => openEditModal('${cat}', ${index}))" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-1.5 px-3 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer">
                                 <i class="fa-solid fa-pen-to-square"></i> Editar
                             </button>
-                            <button onclick="deletePokemon('${cat}', ${index})" class="flex-1 bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 py-1.5 px-3 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 border border-rose-900/40 cursor-pointer">
+                            <button onclick="requestAdminAuth(() => deletePokemon('${cat}', ${index}))" class="flex-1 bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 py-1.5 px-3 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 border border-rose-900/40 cursor-pointer">
                                 <i class="fa-solid fa-trash-can"></i> Vender/Excluir
                             </button>
                         </div>
@@ -503,12 +537,6 @@
         }
 
         window.openAddModal = function() {
-            const pwd = prompt("Digite a senha de administrador:");
-            if (pwd !== "Shared@2026") {
-                if (pwd !== null) alert("Senha incorreta!");
-                return;
-            }
-
             document.getElementById('modalTitle').innerText = 'Adicionar Novo Pokémon';
             document.getElementById('editCategory').value = '';
             document.getElementById('editIndex').value = '';
@@ -522,11 +550,6 @@
         }
 
         window.openAutoModal = function() {
-            const pwd = prompt("Digite a senha de administrador:");
-            if (pwd !== "Shared@2026") {
-                if (pwd !== null) alert("Senha incorreta!");
-                return;
-            }
             document.getElementById('autoModal').classList.remove('hidden');
         }
 
