@@ -29,7 +29,7 @@
         const ADMIN_PASSWORD = "Shared@2026";
 
         function verifyPassword() {
-            const pwd = prompt("Digite a senha de administrador para continuar:");
+            const pwd = prompt("Digite a senha de administrador (Shared@2026):");
             if (pwd === ADMIN_PASSWORD) {
                 return true;
             } else if (pwd !== null) {
@@ -96,7 +96,7 @@
                     await batch.commit();
                 }
 
-                alert(`Sucesso! ${totalSaved} Pokémons gravados na nuvem do Firebase.`);
+                alert(`Sucesso! ${totalSaved} Pokémons gravados na nuvem.`);
             } catch (error) {
                 console.error("Erro na importação: ", error);
                 alert("Erro ao gravar no Firebase: " + error.message);
@@ -116,11 +116,12 @@
         };
 
         window.deletePokemonFromFirebase = async function(category, index) {
-            if (!verifyPassword()) return;
+            if (!verifyPassword()) return; // Pede senha aqui
             try {
                 const item = window.currentData[category][index];
                 if (item && item.id) {
                     await deleteDoc(doc(db, COLLECTION_NAME, item.id));
+                    alert("Pokémon excluído com sucesso!");
                 }
             } catch (error) {
                 console.error("Erro ao excluir do Firebase: ", error);
@@ -129,7 +130,7 @@
         };
 
         window.clearFirebaseData = async function() {
-            if (!verifyPassword()) return;
+            if (!verifyPassword()) return; // Pede senha aqui
             try {
                 const snapshot = await getDocs(collection(db, COLLECTION_NAME));
                 let batch = writeBatch(db);
@@ -502,8 +503,7 @@
         }
 
         window.openAddModal = function() {
-            // Pede senha antes de abrir o modal de adicionar
-            const pwd = prompt("Digite a senha de administrador para adicionar um Pokémon:");
+            const pwd = prompt("Digite a senha de administrador (Shared@2026):");
             if (pwd !== "Shared@2026") {
                 if (pwd !== null) alert("Senha incorreta!");
                 return;
@@ -522,7 +522,7 @@
         }
 
         window.openAutoModal = function() {
-            const pwd = prompt("Digite a senha de administrador para a importação automática:");
+            const pwd = prompt("Digite a senha de administrador (Shared@2026):");
             if (pwd !== "Shared@2026") {
                 if (pwd !== null) alert("Senha incorreta!");
                 return;
